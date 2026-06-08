@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QFrame, QScrollArea, QStackedWidget
 )
 from PyQt6.QtGui import QGuiApplication, QIcon, QPixmap
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSettings
 
 
 class GamescopeHelper(QMainWindow):
@@ -20,50 +20,52 @@ class GamescopeHelper(QMainWindow):
         self.setWindowTitle("Gamescope Helper")
         self.setMinimumWidth(500)
         self.resize(600, 700)
+        self.settings = QSettings("GamescopeHelper", "GamescopeHelper")
         self._setup_ui()
         self._connect_signals()
         self._update_command()
 
+        # Show welcome screen only once
+        if self.settings.value("welcome_shown", type=bool):
+            self.stacked_widget.setCurrentIndex(1)  # skip welcome on subsequent launches
+        else:
+            self.stacked_widget.setCurrentIndex(0)  # show welcome first time
+
+    # --------------------------------------------------------------
+    # UI construction
+    # --------------------------------------------------------------
     def _setup_ui(self):
-        # Main stacked widget to handle welcome screen and main interface
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
-        
-        # Welcome screen
-        self._create_welcome_screen()
-        
-        # Main interface
-        self._create_main_interface()
-        
-        # Start with welcome screen
-        self.stacked_widget.setCurrentIndex(0)
 
+        self._create_welcome_screen()
+        self._create_main_interface()
+
+    # --------------------------------------------------------------
+    # Welcome screen
+    # --------------------------------------------------------------
     def _create_welcome_screen(self):
         welcome_widget = QWidget()
         welcome_layout = QVBoxLayout(welcome_widget)
         welcome_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         welcome_layout.setSpacing(20)
         welcome_layout.setContentsMargins(20, 20, 20, 20)
-        
-        # Icon/Logo
+
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Try to use the PNG icon if available
         if os.path.exists("gamescope helper.png"):
             pixmap = QPixmap("gamescope helper.png")
             if not pixmap.isNull():
-                # Scale the pixmap to a reasonable size
-                scaled_pixmap = pixmap.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                scaled_pixmap = pixmap.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio,
+                                              Qt.TransformationMode.SmoothTransformation)
                 icon_label.setPixmap(scaled_pixmap)
         else:
-            # Fallback to emoji
             icon_label.setText("🎮")
             font = icon_label.font()
             font.setPointSize(48)
             icon_label.setFont(font)
         welcome_layout.addWidget(icon_label)
-        
-        # Title
+
         title_label = QLabel("Gamescope Helper")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         font = title_label.font()
@@ -71,15 +73,13 @@ class GamescopeHelper(QMainWindow):
         font.setBold(True)
         title_label.setFont(font)
         welcome_layout.addWidget(title_label)
-        
-        # Description
+
         desc_label = QLabel("Generate Gamescope launch commands for Steam")
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc_label.setWordWrap(True)
         desc_label.setMaximumWidth(350)
         welcome_layout.addWidget(desc_label)
-        
-        # Start button
+
         start_button = QPushButton("Get Started")
         start_button.setMinimumSize(180, 45)
         font = start_button.font()
@@ -87,34 +87,35 @@ class GamescopeHelper(QMainWindow):
         start_button.setFont(font)
         start_button.clicked.connect(self._show_main_interface)
         welcome_layout.addWidget(start_button, alignment=Qt.AlignmentFlag.AlignCenter)
-        
+
         self.stacked_widget.addWidget(welcome_widget)
 
+    # --------------------------------------------------------------
+    # Main interface
+    # --------------------------------------------------------------
     def _create_main_interface(self):
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
         main_layout.setSpacing(12)
         main_layout.setContentsMargins(16, 16, 16, 16)
-        
-        # Create scroll area for the main content
+
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         main_layout.addWidget(scroll_area)
-        
-        # Content widget inside scroll area
+
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
         content_layout.setSpacing(10)
         scroll_area.setWidget(content_widget)
-        
-        # --- Gamescope Master Switch ---
-        self.enable_gamescope = QCheckBox("Habilitar Gamescope (Master Switch)")
+
+        # Gamescope master switch
+        self.enable_gamescope = QCheckBox("Habilitar Gamescope")
         self.enable_gamescope.setChecked(True)
         self.enable_gamescope.setToolTip("Enable or disable Gamescope entirely")
         content_layout.addWidget(self.enable_gamescope)
-        
-        # --- Game Resolution ---
+
+        # Game Resolution
         self.game_res_group = QGroupBox("Game Resolution")
         game_res_layout = QGridLayout(self.game_res_group)
         self.spin_w = QSpinBox()
@@ -127,11 +128,10 @@ class GamescopeHelper(QMainWindow):
         self.spin_h.setToolTip("Internal game height (-h)")
         game_res_layout.addWidget(QLabel("Width (-w):"), 0, 0)
         game_res_layout.addWidget(self.spin_w, 0, 1)
-        game_res_layout.addWidget(QLabel("Height (-h):"), 1, 0)
         game_res_layout.addWidget(self.spin_h, 1, 1)
         content_layout.addWidget(self.game_res_group)
-        
-        # --- Output Resolution ---
+
+        # Output Resolution
         self.out_res_group = QGroupBox("Output Resolution")
         out_res_layout = QGridLayout(self.out_res_group)
         self.spin_W = QSpinBox()
@@ -144,11 +144,10 @@ class GamescopeHelper(QMainWindow):
         self.spin_H.setToolTip("Gamescope output height (-H)")
         out_res_layout.addWidget(QLabel("Width (-W):"), 0, 0)
         out_res_layout.addWidget(self.spin_W, 0, 1)
-        out_res_layout.addWidget(QLabel("Height (-H):"), 1, 0)
         out_res_layout.addWidget(self.spin_H, 1, 1)
         content_layout.addWidget(self.out_res_group)
-        
-        # --- Refresh Rate ---
+
+        # Refresh Rate
         self.hz_group = QGroupBox("Refresh Rate")
         hz_layout = QHBoxLayout(self.hz_group)
         self.spin_r = QSpinBox()
@@ -160,8 +159,8 @@ class GamescopeHelper(QMainWindow):
         hz_layout.addWidget(self.spin_r)
         hz_layout.addStretch()
         content_layout.addWidget(self.hz_group)
-        
-        # --- Scaling ---
+
+        # Scaling
         self.scaling_group = QGroupBox("Scaling")
         scaling_layout = QGridLayout(self.scaling_group)
         self.combo_scaling = QComboBox()
@@ -171,8 +170,8 @@ class GamescopeHelper(QMainWindow):
         self.combo_scaling.setToolTip("Scaling mode (-S)")
         scaling_layout.addWidget(QLabel("Scaling (-S):"), 0, 0)
         scaling_layout.addWidget(self.combo_scaling, 0, 1)
-        content_layout.addWidget(self.scaling_group)
-        
+
+        # Upscaling selection
         self.combo_upscaling = QComboBox()
         self.combo_upscaling.addItem("None", "")
         self.combo_upscaling.addItem("FSR", "fsr")
@@ -180,9 +179,21 @@ class GamescopeHelper(QMainWindow):
         self.combo_upscaling.setToolTip("Upscaling (-F)")
         scaling_layout.addWidget(QLabel("Upscaling (-F):"), 1, 0)
         scaling_layout.addWidget(self.combo_upscaling, 1, 1)
+
+        # FSR Sharpness (dynamic visibility)
+        sharp_label = QLabel("FSR Sharpness:")
+        sharp_label.setToolTip("Sharpness level for FSR upscaling")
+        self.spin_sharpness = QSpinBox()
+        self.spin_sharpness.setRange(0, 20)
+        self.spin_sharpness.setValue(5)
+        self.spin_sharpness.setSuffix(" (0-20)")
+        self.spin_sharpness.setToolTip("FSR sharpness level")
+        scaling_layout.addWidget(sharp_label, 2, 0)
+        scaling_layout.addWidget(self.spin_sharpness, 2, 1)
+        self.spin_sharpness.setVisible(False)
         content_layout.addWidget(self.scaling_group)
-        
-        # --- Display Mode ---
+
+        # Display Mode
         self.display_group_box = QGroupBox("Display Mode")
         display_layout = QHBoxLayout(self.display_group_box)
         self.radio_window = QRadioButton("Window (Default)")
@@ -200,8 +211,33 @@ class GamescopeHelper(QMainWindow):
         display_layout.addWidget(self.radio_fullscreen)
         display_layout.addWidget(self.radio_borderless)
         content_layout.addWidget(self.display_group_box)
-        
-        # --- Proton Settings ---
+
+        # Other Settings (mouse capture only)
+        self.other_group = QGroupBox("Other Settings")
+        other_layout = QVBoxLayout(self.other_group)
+        self.check_grab = QCheckBox("Capture mouse cursor (--force-grab-cursor / -g)")
+        self.check_grab.setToolTip("Force grab cursor")
+        other_layout.addWidget(self.check_grab)
+        content_layout.addWidget(self.other_group)
+
+        # Environment Variables (including Feral Gamemode)
+        env_group = QGroupBox("Environment Variables")
+        env_layout = QVBoxLayout(env_group)
+        self.check_clear_preload = QCheckBox("Limpar LD_PRELOAD")
+        self.check_clear_preload.setToolTip('Adds LD_PRELOAD=""')
+        env_layout.addWidget(self.check_clear_preload)
+        self.check_amd_antlag = QCheckBox("AMD Anti-Lag")
+        self.check_amd_antlag.setToolTip("Enable AMD Anti-Lag (adds ENABLE_AMD_ANTI_LAG=1)")
+        env_layout.addWidget(self.check_amd_antlag)
+        self.check_vkbasalt = QCheckBox("vkBasalt")
+        self.check_vkbasalt.setToolTip('Adds ENABLE_VKBASALT=1')
+        env_layout.addWidget(self.check_vkbasalt)
+        self.check_feral = QCheckBox("Feral Gamemode (gamemoderun)")
+        self.check_feral.setToolTip("Run with gamemoderun wrapper")
+        env_layout.addWidget(self.check_feral)
+        content_layout.addWidget(env_group)
+
+        # Proton Settings (placed directly below Other Settings)
         proton_group = QGroupBox("Proton Settings")
         proton_layout = QVBoxLayout(proton_group)
         dll_layout = QHBoxLayout()
@@ -212,50 +248,17 @@ class GamescopeHelper(QMainWindow):
         dll_layout.addWidget(self.dll_overrides_input)
         proton_layout.addLayout(dll_layout)
         content_layout.addWidget(proton_group)
-        
-        # --- Other Settings ---
-        self.other_group = QGroupBox("Other Settings")
-        other_layout = QVBoxLayout(self.other_group)
-        self.check_grab = QCheckBox("Capture mouse cursor (--force-grab-cursor / -g)")
-        self.check_grab.setToolTip("Force grab cursor")
-        other_layout.addWidget(self.check_grab)
-        self.check_feral = QCheckBox("Feral Gamemode (gamemoderun)")
-        self.check_feral.setToolTip("Run with gamemoderun wrapper")
-        other_layout.addWidget(self.check_feral)
-        sharp_layout = QHBoxLayout()
-        sharp_layout.addWidget(QLabel("FSR Sharpness (--sharpness):"))
-        self.spin_sharpness = QSpinBox()
-        self.spin_sharpness.setRange(0, 20)
-        self.spin_sharpness.setValue(5)
-        self.spin_sharpness.setSuffix(" (0-20)")
-        self.spin_sharpness.setToolTip("FSR sharpness level")
-        sharp_layout.addWidget(self.spin_sharpness)
-        sharp_layout.addStretch()
-        other_layout.addLayout(sharp_layout)
-        content_layout.addWidget(self.other_group)
-        
-        # --- Environment Variables ---
-        env_group = QGroupBox("Environment Variables")
-        env_layout = QVBoxLayout(env_group)
-        self.check_clear_preload = QCheckBox("Limpar LD_PRELOAD")
-        self.check_clear_preload.setToolTip('Adiciona LD_PRELOAD=""')
-        env_layout.addWidget(self.check_clear_preload)
-        self.check_mesa_anti_lag = QCheckBox("Mesa Anti-Lag")
-        self.check_mesa_anti_lag.setToolTip('Adiciona ENABLE_LAYER_MESA_ANTI_LAG=1')
-        env_layout.addWidget(self.check_mesa_anti_lag)
-        self.check_vkbasalt = QCheckBox("vkBasalt")
-        self.check_vkbasalt.setToolTip('Adiciona ENABLE_VKBASALT=1')
-        env_layout.addWidget(self.check_vkbasalt)
-        content_layout.addWidget(env_group)
-        
-        # --- Output Area ---
+
+        # Output Area
         output_layout = QVBoxLayout()
         output_layout.setSpacing(8)
         output_label = QLabel("Generated Command:")
         output_layout.addWidget(output_label)
         self.cmd_output = QLineEdit()
         self.cmd_output.setReadOnly(True)
-        self.cmd_output.setPlaceholderText("Command will appear here as you change options...")
+        self.cmd_output.setPlaceholderText(
+            "Command will appear here as you change options..."
+        )
         self.cmd_output.setMinimumHeight(30)
         output_layout.addWidget(self.cmd_output)
         btn_layout = QHBoxLayout()
@@ -266,12 +269,16 @@ class GamescopeHelper(QMainWindow):
         btn_layout.addWidget(self.copy_btn)
         output_layout.addLayout(btn_layout)
         content_layout.addLayout(output_layout)
-        
+
         # Add stretch to push everything to top
         content_layout.addStretch()
         main_layout.addLayout(content_layout)
+
         self.stacked_widget.addWidget(main_widget)
 
+    # --------------------------------------------------------------
+    # Signal connections
+    # --------------------------------------------------------------
     def _connect_signals(self):
         self.spin_w.valueChanged.connect(self._update_command)
         self.spin_h.valueChanged.connect(self._update_command)
@@ -285,7 +292,7 @@ class GamescopeHelper(QMainWindow):
         self.check_feral.stateChanged.connect(self._update_command)
         self.spin_sharpness.valueChanged.connect(self._update_command)
         self.check_clear_preload.stateChanged.connect(self._update_command)
-        self.check_mesa_anti_lag.stateChanged.connect(self._update_command)
+        self.check_amd_antlag.stateChanged.connect(self._update_command)
         self.check_vkbasalt.stateChanged.connect(self._update_command)
         self.dll_overrides_input.textChanged.connect(self._update_command)
         self.enable_gamescope.stateChanged.connect(self._update_gamescope_enabled)
@@ -294,49 +301,60 @@ class GamescopeHelper(QMainWindow):
         self._on_upscaling_changed()
         self._update_gamescope_enabled()
 
+    # --------------------------------------------------------------
+    # Dynamic behaviour
+    # --------------------------------------------------------------
     def _on_upscaling_changed(self):
+        """Show FSR Sharpness spinbox only when FSR is selected."""
         is_fsr = self.combo_upscaling.currentData() == "fsr"
+        self.spin_sharpness.setVisible(is_fsr)
         self.spin_sharpness.setEnabled(is_fsr)
 
     def _update_gamescope_enabled(self):
+        """Show/hide sections that depend on Gamescope being enabled."""
         enabled = self.enable_gamescope.isChecked()
-        self.game_res_group.setEnabled(enabled)
-        self.out_res_group.setEnabled(enabled)
-        self.hz_group.setEnabled(enabled)
-        self.scaling_group.setEnabled(enabled)
-        self.display_group_box.setEnabled(enabled)
-        self.other_group.setEnabled(enabled)
+        self.game_res_group.setVisible(enabled)
+        self.out_res_group.setVisible(enabled)
+        self.hz_group.setVisible(enabled)
+        self.scaling_group.setVisible(enabled)
+        self.display_group_box.setVisible(enabled)
+        # Visibility of capture checkbox mirrors Gamescope state
+        self.check_grab.setVisible(enabled)
+        if not enabled:
+            self.check_grab.setChecked(False)
         self._update_command()
 
+    # --------------------------------------------------------------
+    # Command generation
+    # --------------------------------------------------------------
     def _update_command(self):
         env_vars = []
 
-        # Environment variables
+        # ----- Environment variables -------------------------------------------------
         if self.check_clear_preload.isChecked():
             env_vars.append('LD_PRELOAD=""')
-        if self.check_mesa_anti_lag.isChecked():
-            env_vars.append('ENABLE_LAYER_MESA_ANTI_LAG=1')
+        if self.check_amd_antlag.isChecked():          # AMD Anti‑Lag (renamed)
+            env_vars.append('ENABLE_AMD_ANTI_LAG=1')
         if self.check_vkbasalt.isChecked():
             env_vars.append('ENABLE_VKBASALT=1')
+        if self.check_feral.isChecked():
+            env_vars.append("gamemoderun")   # wrapper flag
 
-        # WINEDLLOVERRIDES
+        # ----- DLL overrides ---------------------------------------------------------
         dll_overrides = self.dll_overrides_input.text().strip()
         if dll_overrides:
             overrides = ";".join([f"{dll.strip()}=n,b" for dll in dll_overrides.split(",")])
             env_vars.append(f'WINEDLLOVERRIDES="{overrides}"')
 
-        # Add gamemoderun wrapper if enabled
-        if self.check_feral.isChecked():
-            env_vars.append("gamemoderun")
-
+        # ----- Build final command string -------------------------------------------
         parts = []
         if env_vars:
             parts.extend(env_vars)
 
-        # Gamescope command
+        # ----- Gamescope command (only when enabled) ---------------------------------
         if self.enable_gamescope.isChecked():
             gamescope_parts = ["gamescope"]
-
+            # Basic geometry arguments
             if self.spin_w.value() > 0:
                 gamescope_parts.extend(["-w", str(self.spin_w.value())])
             if self.spin_h.value() > 0:
@@ -345,29 +363,31 @@ class GamescopeHelper(QMainWindow):
                 gamescope_parts.extend(["-W", str(self.spin_W.value())])
             if self.spin_H.value() > 0:
                 gamescope_parts.extend(["-H", str(self.spin_H.value())])
-
             if self.spin_r.value() > 0:
                 gamescope_parts.extend(["-r", str(self.spin_r.value())])
 
+            # Scaling / upscaling
             scaling_val = self.combo_scaling.currentData()
             if scaling_val:
                 gamescope_parts.extend(["-S", scaling_val])
-
             upscale_val = self.combo_upscaling.currentData()
             if upscale_val:
                 gamescope_parts.extend(["-F", upscale_val])
-            if upscale_val == "fsr" and self.spin_sharpness.value() > 0:
-                gamescope_parts.extend(["--sharpness", str(self.spin_sharpness.value())])
+                if upscale_val == "fsr" and self.spin_sharpness.value() > 0:
+                    gamescope_parts.extend(["--sharpness", str(self.spin_sharpness.value())])
 
+            # Display mode selection
             checked = self.display_group.checkedId()
             if checked == 1:
                 gamescope_parts.append("-f")
             elif checked == 2:
                 gamescope_parts.append("-b")
 
+            # Cursor grab (visible only when Gamescope enabled)
             if self.check_grab.isChecked():
                 gamescope_parts.append("--force-grab-cursor")
 
+            # Separator before placeholder
             gamescope_parts.append("--")
             parts.extend(gamescope_parts)
 
@@ -379,8 +399,12 @@ class GamescopeHelper(QMainWindow):
     def _copy_to_clipboard(self):
         QGuiApplication.clipboard().setText(self.cmd_output.text())
 
+    # --------------------------------------------------------------
+    # UI navigation helpers
+    # --------------------------------------------------------------
     def _show_main_interface(self):
         self.stacked_widget.setCurrentIndex(1)
+        self.settings.setValue("welcome_shown", True)
 
     def _show_welcome_screen(self):
         self.stacked_widget.setCurrentIndex(0)
@@ -394,13 +418,12 @@ def main():
     app.setApplicationName("Gamescope Helper")
     app.setApplicationVersion("1.0")
     app.setOrganizationName("GamescopeHelper")
-    
-    # Set application icon if available
+
     if os.path.exists("gamescope helper.png"):
         app.setWindowIcon(QIcon("gamescope helper.png"))
     elif os.path.exists("gamescope helper.ico"):
         app.setWindowIcon(QIcon("gamescope helper.ico"))
-    
+
     window = GamescopeHelper()
     window.show()
     sys.exit(app.exec())
